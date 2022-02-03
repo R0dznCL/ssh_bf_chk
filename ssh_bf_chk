@@ -1,0 +1,252 @@
+#!/bin/bash
+clear
+echo ""
+echo ""
+echo "   #########################################################"
+echo "   #                                                       #"
+echo "   #   SSH Brute Force Check Protection Script             #"
+echo "   #   By R0dznCL                                          #"
+echo "   #                                                       #"
+echo "   #########################################################"
+echo ""
+echo ""
+echo ""
+
+#### Vars
+# This option sets the number of tests per host. 
+# The host must block attempts before the threshold is exceeded. 
+# By default the parameter is set to 6, this to comply with good industry practices (6 connection attempts maximum)
+
+test_by_host="7"
+temp_file="/tmp/ssh_bf_chk.tmp"
+host_timeout="5"
+nmap_timeout="2"
+date_inform=$(date +%Y-%m-%d-%H-%M-%S)
+
+
+
+## Check Deps
+
+#Check SSHPASS
+check_sshpass=$(sshpass -V | grep -w "sshpass")
+	if [ -z "$check_sshpass" ]; then
+		echo "Error - sshpass not found, please install sshpass"
+		exit
+	fi
+
+#Check NMAP
+check_nmap=$(nmap -V | grep -w "Nmap")
+        if [ -z "$check_nmap" ]; then 
+                echo "Error - nmap not found, please install nmap"
+                exit
+        fi
+
+#Check BC
+check_bc=$(bc -v | grep -w "bc")
+        if [ -z "$check_bc" ]; then 
+                echo "Error - bc not found, please install bc"
+                exit
+        fi
+
+#Check SED
+check_sed=$(sed --version | grep -w "sed")
+        if [ -z "$check_sed" ]; then 
+                echo "Error - sed not found, please install sed"
+                exit
+        fi
+
+
+
+
+
+
+#Set VARS From ARGS
+while getopts ":c:n:p:o:" option
+	do
+
+		case ${option} in
+		c)
+			c=${OPTARG}
+		;;
+		n)
+
+			n=${OPTARG}
+		;;
+		p)
+			p=${OPTARG}
+		;;
+		o)
+			o=${OPTARG}
+		;;
+		*)
+		usage
+		;;
+		esac
+	done
+
+
+# If VAR C is  Empty, then force a Value from "count" Var. 
+if [ -z "$c" ]; then
+	c="$test_by_host"
+fi
+
+#Check Network Option
+
+if [ -z "$n" ]; then
+        echo " Error , -n option is Empty "
+	sleep 10
+fi
+
+
+# Search HOST with open ports 
+if [ -z "$p" ]; then
+
+	echo "		Exploring HOST/NETWORK $n ...."
+	echo ""
+	nmap -Pn --host-timeout "$nmap_timeout" -v $n | grep "Discovered" | awk '{ print $4,$6}' > /tmp/ssh_bf_chk.tmp
+	sed -i 's%/tcp%%g' /tmp/ssh_bf_chk.tmp
+else
+
+	echo "          Exploring HOST/NETWORK $n .... port -> $p"
+        echo ""
+        nmap -Pn --host-timeout "$nmap_timeout" -p "$p" -v $n | grep "Discovered" | awk '{ print $4,$6}' > /tmp/ssh_bf_chk.tmp
+        sed -i 's%/tcp%%g' /tmp/ssh_bf_chk.tmp
+
+fi
+
+
+
+
+#Count how many host have open ports
+nlines=$(wc -l /tmp/ssh_bf_chk.tmp | awk '{ print $1}')
+
+
+#Set Value of counter to 1
+count=1
+
+
+
+if [ "$nlines" -eq 0 ];then
+	echo "....Host no found "
+	exit
+fi
+
+
+echo  " Searching SSH Services..."
+
+	touch "$date_inform.txt"
+        echo "          SSH Brute Force Check - Inform" >> "$date_inform".txt
+        echo "          Ref: Date $date_inform" >> "$date_inform".txt
+        echo "" >> "$date_inform".txt
+        echo "" >> "$date_inform".txt
+
+
+
+
+
+function test_ssh {
+
+	host=$(sed -n "$count"p $temp_file | awk '{ print $2}')
+	port=$(sed -n "$count"p $temp_file | awk '{ print $1}')
+	ssh_detect=$(nmap -sV -Pn --host-timeout "$nmap_timeout" -p $port $host | grep -w "OpenSSH")
+
+	if [ -z "$ssh_detect" ]; then
+	ssh_detect=$(nmap -sV -Pn --host-timeout "$nmap_timeout" -p $port $host | grep -w "sshd" )
+	fi
+
+
+
+
+	if [ -n "$ssh_detect" ]; then
+
+	ssh_fail_count=0
+	echo " Testing $host on port $port ....."
+
+
+
+	while [ "$ssh_fail_count" -le "$c" ];
+	do
+		open_port=$(nmap -Pn -p $port $host | grep -w "open")
+		if [ -z "$open_port" ]; then
+			echo	"	$date_detect	host $host	port $port	Info $ssh_fail_count/$c         OK" 
+			echo ""
+			echo    "	$date_detect	host $host	port $port	Info $ssh_fail_count/$c         OK" >> "$date_inform".txt
+
+			break
+		fi
+
+		ssh_fail=$(sshpass -p !error-password ssh -o StrictHostKeyChecking=no -o ConnectTimeout="$host_timeout" -l root -p $port $host 2>&1) 
+		let ssh_fail_count=$ssh_fail_count+1
+
+		open_port=$(nmap -Pn -p $port $host | grep -w "open") 
+
+		if [ "$ssh_fail_count" -gt "$c" ]; then
+			date_detect=$(date +%Y-%m-%d-%H:%M:%S)
+			echo "	$date_detect		host $host	port $port	Info $ssh_fail_count/$c		FAIL"
+			echo ""	
+			echo "	$date_detect		host $host      port $port      Info $ssh_fail_count/$c		FAIL"   >> "$date_inform".txt
+
+		fi
+
+		done
+
+	fi
+
+	}
+
+
+
+
+
+
+
+
+echo ""
+	while [ $count -le $nlines ] 
+	do
+
+	div=$(echo  "scale=2; $count/$nlines" | bc)
+	div=$(echo  "$div*100" | bc | awk -F "." '{ print $1}' )
+
+	test_ssh
+
+
+	if [ "$div" -ge 5 ]; then
+	echo -ne ' !!!!!                                                                                                             (5%)\r'
+	fi
+	if [ "$div" -ge 10 ]; then
+        echo -ne ' !!!!!!!!!!                                                                                                        (10%)\r'
+        fi
+        if [ "$div" -ge 20 ]; then
+        echo -ne ' !!!!!!!!!!!!!!!!!!!!                                                                                              (20%)\r'
+        fi
+	if [ "$div" -ge 30 ]; then
+        echo -ne ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                                                    (30%)\r'
+        fi
+	if [ "$div" -ge 40 ]; then
+        echo -ne ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                                          (40%)\r'
+        fi
+	if [ "$div" -ge 50 ]; then
+        echo -ne ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                                (50%)\r'
+        fi
+	if [ "$div" -ge 60 ]; then
+        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                      (60%)\r'
+        fi
+	if [ "$div" -ge 70 ]; then
+        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                            (70%)\r'
+        fi
+	if [ "$div" -ge 80 ]; then
+        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                  (80%)\r'
+        fi
+	if [ "$div" -ge 90 ]; then
+        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                        (90%)\r'
+        fi
+	if [ "$div" -ge 100 ]; then
+        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              (100%)\r'
+        fi
+	#sed -n 1p /tmp/ssh_bf_chk.tmp 
+	let count=$count+1
+	sleep 1
+	done
+
+
