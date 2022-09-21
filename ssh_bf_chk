@@ -187,7 +187,7 @@ function test_ssh {
 			date_detect=$(date +%Y-%m-%d-%H:%M:%S)
 			out=$(echo "	$date_detect		host $host	port $port	Info $ssh_fail_count/$c		FAIL")
 			echo ""	
-			echo "	$date_detect		host $host      port $port      Info $ssh_fail_count/$c		FAIL"   >> "$date_inform".txt
+			echo "	$date_detect	host $host      port $port      Info $ssh_fail_count/$c		FAIL"   >> "$date_inform".txt
 
 		fi
 
