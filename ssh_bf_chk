@@ -20,8 +20,8 @@ echo ""
 
 test_by_host="7"
 temp_file="/tmp/ssh_bf_chk.tmp"
-host_timeout="5"
-nmap_timeout="2"
+host_timeout="15m"
+nmap_timeout="10"
 date_inform=$(date +%Y-%m-%d-%H-%M-%S)
 
 
@@ -154,27 +154,24 @@ function test_ssh {
 
 	host=$(sed -n "$count"p $temp_file | awk '{ print $2}')
 	port=$(sed -n "$count"p $temp_file | awk '{ print $1}')
-	ssh_detect=$(nmap -sV -Pn --host-timeout "$nmap_timeout" -p $port $host | grep -w "OpenSSH")
+	ssh_detect=$(nmap -sV -Pn --host-timeout "$nmap_timeout" -p $port $host | grep "OpenSSH")
 
 	if [ -z "$ssh_detect" ]; then
-	ssh_detect=$(nmap -sV -Pn --host-timeout "$nmap_timeout" -p $port $host | grep -w "sshd" )
+	ssh_detect=$(nmap -sV -Pn --host-timeout "$nmap_timeout" -p $port $host | grep "sshd" )
 	fi
-
-
 
 
 	if [ -n "$ssh_detect" ]; then
 
 	ssh_fail_count=0
-	echo " Testing $host on port $port ....."
-
+	 
 
 
 	while [ "$ssh_fail_count" -le "$c" ];
 	do
 		open_port=$(nmap -Pn -p $port $host | grep -w "open")
 		if [ -z "$open_port" ]; then
-			echo	"	$date_detect	host $host	port $port	Info $ssh_fail_count/$c         OK" 
+			out=$(echo	"	$date_detect	host $host	port $port	Info $ssh_fail_count/$c         OK") 
 			echo ""
 			echo    "	$date_detect	host $host	port $port	Info $ssh_fail_count/$c         OK" >> "$date_inform".txt
 
@@ -188,14 +185,13 @@ function test_ssh {
 
 		if [ "$ssh_fail_count" -gt "$c" ]; then
 			date_detect=$(date +%Y-%m-%d-%H:%M:%S)
-			echo "	$date_detect		host $host	port $port	Info $ssh_fail_count/$c		FAIL"
+			out=$(echo "	$date_detect		host $host	port $port	Info $ssh_fail_count/$c		FAIL")
 			echo ""	
 			echo "	$date_detect		host $host      port $port      Info $ssh_fail_count/$c		FAIL"   >> "$date_inform".txt
 
 		fi
 
-		done
-
+		done 
 	fi
 
 	}
@@ -204,55 +200,55 @@ function test_ssh {
 
 
 
+	echo ""
 
-
-
-echo ""
 	while [ $count -le $nlines ] 
 	do
 
 	div=$(echo  "scale=2; $count/$nlines" | bc)
 	div=$(echo  "$div*100" | bc | awk -F "." '{ print $1}' )
 
-	test_ssh
-
+        test_ssh
 
 	if [ "$div" -ge 5 ]; then
-	echo -ne ' !!!!!                                                                                                             (5%)\r'
+	echo "5" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
 	fi
 	if [ "$div" -ge 10 ]; then
-        echo -ne ' !!!!!!!!!!                                                                                                        (10%)\r'
+        echo "10" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
         if [ "$div" -ge 20 ]; then
-        echo -ne ' !!!!!!!!!!!!!!!!!!!!                                                                                              (20%)\r'
+        echo "20" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	if [ "$div" -ge 30 ]; then
-        echo -ne ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                                                    (30%)\r'
+        echo "30" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	if [ "$div" -ge 40 ]; then
-        echo -ne ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                                          (40%)\r'
+        echo "40" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	if [ "$div" -ge 50 ]; then
-        echo -ne ' !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                                (50%)\r'
+        echo "50" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	if [ "$div" -ge 60 ]; then
-        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                      (60%)\r'
+        echo "60" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	if [ "$div" -ge 70 ]; then
-        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                            (70%)\r'
+        echo "70" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	if [ "$div" -ge 80 ]; then
-        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                  (80%)\r'
+        echo "80" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	if [ "$div" -ge 90 ]; then
-        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                        (90%)\r'
+        echo "90" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	if [ "$div" -ge 100 ]; then
-        echo -ne '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              (100%)\r'
+        echo "100" | dialog --title "Searching SSH Service" --gauge "$out" 10 70 0
         fi
 	#sed -n 1p /tmp/ssh_bf_chk.tmp 
+			
 	let count=$count+1
 	sleep 1
 	done
 
-
+	sleep 5
+	clear
+	cat "$date_inform".txt
